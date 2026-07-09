@@ -391,6 +391,19 @@ textarea:focus { outline: 2px solid var(--azul-boli); outline-offset: 1px; }
 
 .ai-row .ai-include { width: auto; margin: 0; }
 
+/* Token recién creado: seleccionable de un clic, en mono */
+.token-value {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  word-break: break-all;
+  background: var(--kraft);
+  border: 1.5px dashed var(--kraft-deep);
+  padding: 0.6rem;
+  margin-top: 0.5rem;
+  user-select: all;
+}
+
 .new-item-fields {
   border: 1.5px dashed var(--kraft-deep);
   padding: 0.9rem;

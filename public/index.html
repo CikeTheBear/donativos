@@ -296,6 +296,29 @@
           <p id="pw-ok" class="register-ok" hidden>Contraseña actualizada.</p>
           <button type="submit" class="btn btn-primary">Guardar</button>
         </form>
+
+        <h2 class="section-title">Tokens de acceso (MCP)</h2>
+        <p class="empty-note">
+          Permiten conectar un asistente de IA (Claude) a este inventario para
+          consultar y registrar donativos conversando. El token se muestra una
+          sola vez: guárdalo al crearlo.
+        </p>
+        <div id="tokens-list" class="users-list"></div>
+
+        <!-- El token recién creado se muestra aquí, una única vez -->
+        <div id="new-token-box" class="card form-card" hidden>
+          <p><strong>Token creado.</strong> Cópialo ahora — no se volverá a mostrar:</p>
+          <code id="new-token-value" class="token-value"></code>
+        </div>
+
+        <form id="form-token" class="card form-card">
+          <label>
+            Nombre del token
+            <input type="text" id="token-name" placeholder="Claude en mi laptop" required>
+          </label>
+          <p id="token-error" class="form-error" hidden></p>
+          <button type="submit" class="btn btn-primary">Crear token</button>
+        </form>
       </section>
 
     </main>

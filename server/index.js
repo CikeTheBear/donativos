@@ -5,6 +5,7 @@
 // step: lo que hay en public/ es exactamente lo que recibe el navegador.
 
 import express from 'express';
+import { randomBytes } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { db } from './db.js';
@@ -14,6 +15,8 @@ import {
   requireAuth, requireAdmin,
 } from './auth.js';
 import { parseDonations } from './llm.js';
+import { getStock, getMoneyBalances, importBatch } from './inventory.js';
+import { mountMcp, hashToken } from './mcp.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -97,22 +100,9 @@ app.post('/api/items', (req, res) => {
 
 // ─── Stock (calculado, nunca almacenado) ────────────────────────────
 
-// Devuelve cada artículo con sus totales. El stock actual es
-// entradas - salidas: la única fuente de verdad son los movimientos.
-const stockQuery = db.prepare(`
-  SELECT
-    i.id, i.name, i.category, i.unit,
-    COALESCE(SUM(CASE WHEN m.type = 'entrada' THEN m.quantity END), 0) AS entradas,
-    COALESCE(SUM(CASE WHEN m.type = 'salida'  THEN m.quantity END), 0) AS salidas
-  FROM items i
-  LEFT JOIN movements m ON m.item_id = i.id
-  GROUP BY i.id
-  ORDER BY i.category, i.name
-`);
-
+// La lógica vive en inventory.js: la comparten esta API y el MCP.
 app.get('/api/stock', (req, res) => {
-  const rows = stockQuery.all().map(r => ({ ...r, stock: r.entradas - r.salidas }));
-  res.json(rows);
+  res.json(getStock());
 });
 
 // ─── Movimientos de bienes ──────────────────────────────────────────
@@ -250,64 +240,8 @@ app.post('/api/parse', async (req, res) => {
   }
 });
 
-// Paso 2: el humano revisó y confirmó. Insertamos todo en UNA transacción:
-// o entra el lote completo o no entra nada (sin registros a medias).
-const importBatch = db.transaction((rows, userId) => {
-  const results = [];
-  for (const row of rows) {
-    if (row.kind === 'dinero') {
-      const amt = Number(row.amount);
-      if (!Number.isFinite(amt) || amt <= 0) throw new Error(`Monto no válido: "${row.amount}"`);
-      if (!['USD', 'EUR', 'VES'].includes(row.currency)) throw new Error(`Moneda no válida: "${row.currency}"`);
-      if (!['entrada', 'salida'].includes(row.type)) throw new Error('Tipo de movimiento no válido');
-      db.prepare(`
-        INSERT INTO money_movements (type, amount, currency, party, notes, date, user_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(row.type, amt, row.currency, row.party?.trim() || null,
-             row.notes?.trim() || null, row.date, userId);
-      results.push(`${row.type} de dinero: ${amt} ${row.currency}`);
-      continue;
-    }
-
-    // Bienes: reutilizar el artículo si existe, crearlo si no.
-    const qty = Number(row.quantity);
-    if (!Number.isFinite(qty) || qty <= 0) {
-      throw new Error(`Cantidad no válida en "${row.item_name}": revisa la fila antes de confirmar`);
-    }
-    if (!['entrada', 'salida'].includes(row.type)) throw new Error('Tipo de movimiento no válido');
-
-    let item = db.prepare('SELECT * FROM items WHERE lower(trim(name)) = lower(trim(?))')
-      .get(row.item_name);
-    if (!item) {
-      const info = db.prepare('INSERT INTO items (name, category, unit) VALUES (?, ?, ?)')
-        .run(row.item_name.trim(), row.category?.trim() || 'Sin categoría',
-             row.unit?.trim() || 'unidades');
-      item = db.prepare('SELECT * FROM items WHERE id = ?').get(info.lastInsertRowid);
-    }
-
-    // Misma regla que el registro manual: no despachar más de lo que hay.
-    // La consulta ve los inserts previos de esta misma transacción, así
-    // que una entrada y su salida en el mismo lote se validan en orden.
-    if (row.type === 'salida') {
-      const s = db.prepare(`
-        SELECT COALESCE(SUM(CASE WHEN type = 'entrada' THEN quantity ELSE -quantity END), 0) AS stock
-        FROM movements WHERE item_id = ?
-      `).get(item.id);
-      if (qty > s.stock) {
-        throw new Error(`Stock insuficiente de "${item.name}": hay ${s.stock} ${item.unit}`);
-      }
-    }
-
-    db.prepare(`
-      INSERT INTO movements (type, item_id, quantity, party, notes, date, user_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(row.type, item.id, qty, row.party?.trim() || null,
-           row.notes?.trim() || null, row.date, userId);
-    results.push(`${row.type}: ${qty} ${item.unit} de ${item.name}`);
-  }
-  return results;
-});
-
+// Paso 2: el humano revisó y confirmó. importBatch (inventory.js)
+// inserta todo en UNA transacción: o entra el lote completo o nada.
 app.post('/api/import', (req, res) => {
   const { rows } = req.body || {};
   if (!Array.isArray(rows) || rows.length === 0) {
@@ -325,18 +259,7 @@ app.post('/api/import', (req, res) => {
 // ─── Resumen para el dashboard ──────────────────────────────────────
 
 app.get('/api/summary', (req, res) => {
-  const stock = stockQuery.all().map(r => ({ ...r, stock: r.entradas - r.salidas }));
-
-  // Totales de dinero agrupados por moneda (cada moneda es su propio saldo).
-  const money = db.prepare(`
-    SELECT currency,
-      COALESCE(SUM(CASE WHEN type = 'entrada' THEN amount END), 0) AS recibido,
-      COALESCE(SUM(CASE WHEN type = 'salida'  THEN amount END), 0) AS entregado
-    FROM money_movements
-    GROUP BY currency
-  `).all().map(r => ({ ...r, disponible: r.recibido - r.entregado }));
-
-  res.json({ stock, money });
+  res.json({ stock: getStock(), money: getMoneyBalances() });
 });
 
 // ─── Gestión de usuarios (solo admin) ───────────────────────────────
@@ -384,6 +307,42 @@ app.delete('/api/users/:id', requireAdmin, (req, res) => {
     });
   }
 });
+
+// ─── Tokens de acceso MCP ───────────────────────────────────────────
+
+// Cada usuario gestiona sus propios tokens desde la pestaña Cuenta.
+// El token en claro solo existe en la respuesta de creación: en la BD
+// queda su hash (ver api_tokens en db.js).
+app.get('/api/tokens', (req, res) => {
+  res.json(db.prepare(`
+    SELECT id, name, created_at, last_used FROM api_tokens
+    WHERE user_id = ? ORDER BY created_at DESC
+  `).all(req.user.id));
+});
+
+app.post('/api/tokens', (req, res) => {
+  const { name } = req.body || {};
+  if (!name?.trim()) {
+    return res.status(400).json({ error: 'Ponle un nombre al token (ej: "Claude en mi laptop")' });
+  }
+  // Prefijo "dnt_" para reconocer los tokens de esta app a simple vista.
+  const token = 'dnt_' + randomBytes(32).toString('hex');
+  db.prepare('INSERT INTO api_tokens (token_hash, name, user_id) VALUES (?, ?, ?)')
+    .run(hashToken(token), name.trim(), req.user.id);
+  res.json({ token, name: name.trim() });
+});
+
+app.delete('/api/tokens/:id', (req, res) => {
+  // Solo se pueden revocar tokens propios.
+  const info = db.prepare('DELETE FROM api_tokens WHERE id = ? AND user_id = ?')
+    .run(req.params.id, req.user.id);
+  if (info.changes === 0) return res.status(404).json({ error: 'Token no encontrado' });
+  res.json({ ok: true });
+});
+
+// ─── Endpoint MCP (fuera de /api: usa tokens, no cookies) ──────────
+
+mountMcp(app);
 
 // ─── Arranque ───────────────────────────────────────────────────────
 

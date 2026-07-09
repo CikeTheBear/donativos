@@ -91,7 +91,7 @@ const tabLoaders = {
   registrar: loadRegisterForm,
   historial: loadHistory,
   usuarios: loadUsers,
-  cuenta: () => {},
+  cuenta: loadTokens,
 };
 
 function switchTab(name) {
@@ -507,6 +507,52 @@ $('#form-password').addEventListener('submit', async (e) => {
   } catch (err) {
     errEl.textContent = err.message;
     errEl.hidden = false;
+  }
+});
+
+// ─── Tokens de acceso MCP ───────────────────────────────────────────
+
+async function loadTokens() {
+  const tokens = await api('/api/tokens');
+  $('#tokens-list').innerHTML = tokens.length
+    ? tokens.map((t) => `
+        <div class="user-row">
+          <span class="name">${esc(t.name)}</span>
+          <span class="role">${t.last_used ? `usado ${esc(t.last_used.slice(0, 10))}` : 'sin usar'}</span>
+          <button class="btn-delete" data-id="${t.id}">revocar</button>
+        </div>`).join('')
+    : '<p class="empty-note">No tienes tokens creados.</p>';
+}
+
+$('#form-token').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errEl = $('#token-error');
+  errEl.hidden = true;
+  try {
+    const { token } = await api('/api/tokens', {
+      method: 'POST',
+      body: { name: $('#token-name').value },
+    });
+    // Única vez que el token existe en claro fuera del servidor.
+    $('#new-token-value').textContent = token;
+    $('#new-token-box').hidden = false;
+    $('#form-token').reset();
+    loadTokens();
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.hidden = false;
+  }
+});
+
+$('#tokens-list').addEventListener('click', async (e) => {
+  const btn = e.target.closest('.btn-delete');
+  if (!btn) return;
+  if (!confirm('¿Revocar este token? Los clientes que lo usen dejarán de funcionar.')) return;
+  try {
+    await api(`/api/tokens/${btn.dataset.id}`, { method: 'DELETE' });
+    loadTokens();
+  } catch (err) {
+    alert(err.message);
   }
 });
 

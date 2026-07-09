@@ -50,6 +50,18 @@ db.exec(`
     expires_at TEXT NOT NULL
   );
 
+  -- Tokens de acceso personales para el endpoint MCP (/mcp).
+  -- Guardamos el HASH del token, no el token: si alguien roba la BD no
+  -- obtiene tokens usables. El token real solo se muestra al crearlo.
+  CREATE TABLE IF NOT EXISTS api_tokens (
+    id         INTEGER PRIMARY KEY,
+    token_hash TEXT NOT NULL UNIQUE,
+    name       TEXT NOT NULL,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    last_used  TEXT
+  );
+
   -- Catálogo de artículos donables (arroz, paracetamol, mantas...).
   -- unit es la unidad de medida: kg, unidades, cajas, litros...
   CREATE TABLE IF NOT EXISTS items (
