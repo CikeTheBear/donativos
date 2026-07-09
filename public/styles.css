@@ -350,6 +350,46 @@ input[type="number"] { font-family: var(--font-mono); }
 
 .stamp-entrada { color: var(--sello-verde); border-color: var(--sello-verde); }
 .stamp-salida  { color: var(--sello-rojo);  border-color: var(--sello-rojo); }
+.stamp-nuevo   { color: var(--azul-boli);   border-color: var(--azul-boli); margin-left: 0.4rem; }
+
+/* ═══ Registro con IA ═══ */
+
+textarea {
+  display: block;
+  width: 100%;
+  margin-top: 0.25rem;
+  padding: 0.55rem 0.6rem;
+  font: 1rem var(--font-body);
+  color: var(--tinta);
+  background: #fff;
+  border: 1.5px solid var(--kraft-deep);
+  border-radius: 0;
+  resize: vertical;
+}
+
+textarea:focus { outline: 2px solid var(--azul-boli); outline-offset: 1px; }
+
+/* Filas de la vista previa: inputs compactos en línea */
+.ai-row .ai-qty {
+  display: inline-block;
+  width: 6rem;
+  margin: 0;
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+/* Cantidad que la IA no pudo determinar: pide corrección a gritos */
+.ai-row .ai-qty-warn { border-color: var(--sello-rojo); background: rgba(163, 59, 36, 0.08); }
+
+.ai-row .ai-type {
+  display: inline-block;
+  width: auto;
+  margin: 0;
+  font-size: 0.85rem;
+  padding: 0.3rem 0.4rem;
+}
+
+.ai-row .ai-include { width: auto; margin: 0; }
 
 .new-item-fields {
   border: 1.5px dashed var(--kraft-deep);

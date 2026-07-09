@@ -146,18 +146,21 @@ async function loadSummary() {
 
 // ─── Registrar movimientos ──────────────────────────────────────────
 
-let registerKind = 'goods'; // 'goods' | 'money'
+let registerKind = 'goods'; // 'goods' | 'money' | 'ai'
 
 function setRegisterKind(kind) {
   registerKind = kind;
   $('#kind-goods').classList.toggle('active', kind === 'goods');
   $('#kind-money').classList.toggle('active', kind === 'money');
+  $('#kind-ai').classList.toggle('active', kind === 'ai');
   $('#form-goods').hidden = kind !== 'goods';
   $('#form-money').hidden = kind !== 'money';
+  $('#form-ai').hidden = kind !== 'ai';
 }
 
 $('#kind-goods').addEventListener('click', () => setRegisterKind('goods'));
 $('#kind-money').addEventListener('click', () => setRegisterKind('money'));
+$('#kind-ai').addEventListener('click', () => setRegisterKind('ai'));
 
 async function loadRegisterForm() {
   // Fecha de hoy por defecto en ambos formularios.
@@ -276,6 +279,114 @@ $('#form-money').addEventListener('submit', async (e) => {
   } catch (err) {
     errEl.textContent = err.message;
     errEl.hidden = false;
+  }
+});
+
+// ─── Registro con IA ────────────────────────────────────────────────
+
+// Las filas propuestas por la IA viven aquí hasta que el usuario
+// confirma. Cada fila se pinta con inputs editables: lo que se envía a
+// /api/import es lo que quedó en los inputs, no lo que dijo la IA.
+let aiRows = [];
+
+$('#ai-parse-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errEl = $('#ai-error');
+  const btn = $('#btn-parse');
+  errEl.hidden = true;
+  btn.disabled = true;
+  btn.textContent = 'Interpretando…';
+  try {
+    const { movements } = await api('/api/parse', {
+      method: 'POST',
+      body: { text: $('#ai-text').value },
+    });
+    aiRows = movements;
+    renderAiPreview();
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.hidden = false;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Interpretar con IA';
+  }
+});
+
+function renderAiPreview() {
+  const container = $('#ai-rows');
+  container.innerHTML = aiRows.map((m, i) => {
+    const isGoods = m.kind === 'bien';
+    // Cantidad 0 = la IA no encontró una cantidad clara: resaltarla.
+    const qtyWarn = isGoods && !(Number(m.quantity) > 0);
+    return `
+      <div class="history-row ai-row" data-i="${i}">
+        <input type="checkbox" class="ai-include" checked>
+        <select class="ai-type">
+          <option value="entrada" ${m.type === 'entrada' ? 'selected' : ''}>Entrada</option>
+          <option value="salida" ${m.type === 'salida' ? 'selected' : ''}>Salida</option>
+        </select>
+        ${isGoods ? `
+          <span class="what">
+            ${esc(m.item_name)}
+            ${m.item_id ? '' : '<span class="stamp stamp-nuevo">nuevo</span>'}
+          </span>
+          <input type="number" class="ai-qty ${qtyWarn ? 'ai-qty-warn' : ''}"
+                 value="${Number(m.quantity)}" min="0.01" step="any"> ${esc(m.unit)}
+        ` : `
+          <span class="what">Dinero</span>
+          <input type="number" class="ai-qty" value="${Number(m.amount)}" min="0.01" step="any">
+          ${esc(m.currency)}
+        `}
+        <span class="meta">
+          ${esc(m.date)}
+          ${m.party ? ` · ${esc(m.party)}` : ''}
+          ${m.notes ? ` · ${esc(m.notes)}` : ''}
+          ${isGoods && !m.item_id ? ` · se creará como ${esc(m.category)} (${esc(m.unit)})` : ''}
+        </span>
+      </div>`;
+  }).join('');
+  $('#ai-preview').hidden = aiRows.length === 0;
+  if (aiRows.length === 0) {
+    $('#ai-error').textContent = 'La IA no encontró movimientos en ese texto.';
+    $('#ai-error').hidden = false;
+  }
+}
+
+$('#btn-import').addEventListener('click', async () => {
+  const errEl = $('#ai-import-error');
+  errEl.hidden = true;
+
+  // Recogemos lo que quedó en los inputs de cada fila marcada.
+  const rows = [...document.querySelectorAll('.ai-row')]
+    .filter((el) => el.querySelector('.ai-include').checked)
+    .map((el) => {
+      const base = aiRows[Number(el.dataset.i)];
+      const edited = { ...base, type: el.querySelector('.ai-type').value };
+      const value = Number(el.querySelector('.ai-qty').value);
+      if (base.kind === 'bien') edited.quantity = value;
+      else edited.amount = value;
+      return edited;
+    });
+
+  if (rows.length === 0) {
+    errEl.textContent = 'No hay filas marcadas para registrar.';
+    errEl.hidden = false;
+    return;
+  }
+
+  const btn = $('#btn-import');
+  btn.disabled = true;
+  try {
+    const { imported } = await api('/api/import', { method: 'POST', body: { rows } });
+    aiRows = [];
+    $('#ai-preview').hidden = true;
+    $('#ai-text').value = '';
+    flashOk(`${imported} movimiento${imported === 1 ? '' : 's'} registrado${imported === 1 ? '' : 's'} ✓`);
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.hidden = false;
+  } finally {
+    btn.disabled = false;
   }
 });
 

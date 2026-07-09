@@ -80,10 +80,11 @@
       <!-- ─── Registrar: bienes o dinero, entrada o salida ─── -->
       <section id="tab-registrar" class="tab-panel" hidden>
 
-        <!-- Selector bienes/dinero: cambia qué formulario se muestra -->
+        <!-- Selector bienes/dinero/IA: cambia qué formulario se muestra -->
         <div class="kind-switch">
           <button id="kind-goods" class="kind-btn active">Bienes</button>
           <button id="kind-money" class="kind-btn">Dinero</button>
+          <button id="kind-ai" class="kind-btn">Texto libre (IA)</button>
         </div>
 
         <!-- Formulario de bienes -->
@@ -207,6 +208,29 @@
           <p id="money-error" class="form-error" hidden></p>
           <button type="submit" class="btn btn-primary btn-block">Registrar movimiento</button>
         </form>
+
+        <!-- Registro con IA: pegar texto libre → revisar → confirmar -->
+        <div id="form-ai" hidden>
+          <form id="ai-parse-form" class="card form-card">
+            <label>
+              Pega tu lista de donativos
+              <textarea id="ai-text" rows="6" required
+                placeholder="Ej: Llegaron 50 kg de arroz y 20 mantas de la iglesia San José.&#10;María trajo $100 y 3 cajas de paracetamol.&#10;Enviamos 10 kg de arroz al refugio El Valle."></textarea>
+            </label>
+            <p id="ai-error" class="form-error" hidden></p>
+            <button type="submit" id="btn-parse" class="btn btn-primary btn-block">Interpretar con IA</button>
+          </form>
+
+          <!-- Vista previa: el humano revisa lo que la IA interpretó antes
+               de que nada toque la base de datos -->
+          <div id="ai-preview" hidden>
+            <h2 class="section-title">Revisa antes de confirmar</h2>
+            <p class="empty-note">Corrige cantidades o desmarca filas. Nada se registra hasta que confirmes.</p>
+            <div id="ai-rows" class="history-list"></div>
+            <p id="ai-import-error" class="form-error" hidden></p>
+            <button id="btn-import" class="btn btn-primary btn-block">Confirmar y registrar</button>
+          </div>
+        </div>
 
         <p id="register-ok" class="register-ok" hidden></p>
       </section>

@@ -13,6 +13,7 @@ import {
   createSession, deleteSession,
   requireAuth, requireAdmin,
 } from './auth.js';
+import { parseDonations } from './llm.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -211,6 +212,114 @@ app.delete('/api/money/:id', requireAdmin, (req, res) => {
   const info = db.prepare('DELETE FROM money_movements WHERE id = ?').run(req.params.id);
   if (info.changes === 0) return res.status(404).json({ error: 'Movimiento no encontrado' });
   res.json({ ok: true });
+});
+
+// ─── Registro con IA: interpretar texto libre y confirmar ──────────
+
+// Paso 1: el LLM convierte texto libre en movimientos PROPUESTOS.
+// No escribe nada en la BD — devuelve la propuesta para revisión humana.
+app.post('/api/parse', async (req, res) => {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return res.status(503).json({
+      error: 'La función de IA no está configurada (falta ANTHROPIC_API_KEY en el servidor)',
+    });
+  }
+  const { text } = req.body || {};
+  if (!text?.trim()) {
+    return res.status(400).json({ error: 'Pega el texto con los donativos a interpretar' });
+  }
+
+  try {
+    const catalog = db.prepare('SELECT id, name, category, unit FROM items').all();
+    const movements = await parseDonations(text.trim(), catalog);
+
+    // Enriquecemos cada propuesta de bienes con el id del artículo si ya
+    // existe en el catálogo (comparación sin mayúsculas/espacios), para
+    // que la vista previa muestre "existente" vs "artículo nuevo".
+    const byName = new Map(catalog.map((i) => [i.name.trim().toLowerCase(), i]));
+    const enriched = movements.map((m) => {
+      if (m.kind !== 'bien') return m;
+      const match = byName.get(m.item_name.trim().toLowerCase());
+      return { ...m, item_id: match ? match.id : null };
+    });
+
+    res.json({ movements: enriched });
+  } catch (e) {
+    console.error('Error en /api/parse:', e);
+    res.status(502).json({ error: `No se pudo interpretar el texto: ${e.message}` });
+  }
+});
+
+// Paso 2: el humano revisó y confirmó. Insertamos todo en UNA transacción:
+// o entra el lote completo o no entra nada (sin registros a medias).
+const importBatch = db.transaction((rows, userId) => {
+  const results = [];
+  for (const row of rows) {
+    if (row.kind === 'dinero') {
+      const amt = Number(row.amount);
+      if (!Number.isFinite(amt) || amt <= 0) throw new Error(`Monto no válido: "${row.amount}"`);
+      if (!['USD', 'EUR', 'VES'].includes(row.currency)) throw new Error(`Moneda no válida: "${row.currency}"`);
+      if (!['entrada', 'salida'].includes(row.type)) throw new Error('Tipo de movimiento no válido');
+      db.prepare(`
+        INSERT INTO money_movements (type, amount, currency, party, notes, date, user_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(row.type, amt, row.currency, row.party?.trim() || null,
+             row.notes?.trim() || null, row.date, userId);
+      results.push(`${row.type} de dinero: ${amt} ${row.currency}`);
+      continue;
+    }
+
+    // Bienes: reutilizar el artículo si existe, crearlo si no.
+    const qty = Number(row.quantity);
+    if (!Number.isFinite(qty) || qty <= 0) {
+      throw new Error(`Cantidad no válida en "${row.item_name}": revisa la fila antes de confirmar`);
+    }
+    if (!['entrada', 'salida'].includes(row.type)) throw new Error('Tipo de movimiento no válido');
+
+    let item = db.prepare('SELECT * FROM items WHERE lower(trim(name)) = lower(trim(?))')
+      .get(row.item_name);
+    if (!item) {
+      const info = db.prepare('INSERT INTO items (name, category, unit) VALUES (?, ?, ?)')
+        .run(row.item_name.trim(), row.category?.trim() || 'Sin categoría',
+             row.unit?.trim() || 'unidades');
+      item = db.prepare('SELECT * FROM items WHERE id = ?').get(info.lastInsertRowid);
+    }
+
+    // Misma regla que el registro manual: no despachar más de lo que hay.
+    // La consulta ve los inserts previos de esta misma transacción, así
+    // que una entrada y su salida en el mismo lote se validan en orden.
+    if (row.type === 'salida') {
+      const s = db.prepare(`
+        SELECT COALESCE(SUM(CASE WHEN type = 'entrada' THEN quantity ELSE -quantity END), 0) AS stock
+        FROM movements WHERE item_id = ?
+      `).get(item.id);
+      if (qty > s.stock) {
+        throw new Error(`Stock insuficiente de "${item.name}": hay ${s.stock} ${item.unit}`);
+      }
+    }
+
+    db.prepare(`
+      INSERT INTO movements (type, item_id, quantity, party, notes, date, user_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(row.type, item.id, qty, row.party?.trim() || null,
+           row.notes?.trim() || null, row.date, userId);
+    results.push(`${row.type}: ${qty} ${item.unit} de ${item.name}`);
+  }
+  return results;
+});
+
+app.post('/api/import', (req, res) => {
+  const { rows } = req.body || {};
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return res.status(400).json({ error: 'No hay movimientos que importar' });
+  }
+  try {
+    const results = importBatch(rows, req.user.id);
+    res.json({ imported: results.length, results });
+  } catch (e) {
+    // La transacción ya hizo rollback: la BD queda intacta.
+    res.status(400).json({ error: e.message });
+  }
 });
 
 // ─── Resumen para el dashboard ──────────────────────────────────────
