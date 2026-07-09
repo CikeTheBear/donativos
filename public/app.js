@@ -592,11 +592,26 @@ $('#tokens-list').addEventListener('click', async (e) => {
   }
 });
 
-// ─── Arranque: ¿hay sesión activa? ──────────────────────────────────
+// ─── Arranque ───────────────────────────────────────────────────────
+
+// La marca del centro (nombre y subtítulo) viene del servidor: cada
+// despliegue la personaliza con variables de entorno.
+async function applyBranding() {
+  try {
+    const { title, subtitle } = await api('/api/branding');
+    document.title = `Acopio — ${title}`;
+    $('#brand-title').textContent = title;
+    $('#brand-sub').textContent = subtitle;
+    $('#brand-detail').textContent = title;
+  } catch {
+    // Sin branding no se bloquea nada: quedan los textos del HTML.
+  }
+}
 
 // Al cargar la página preguntamos al servidor si nuestra cookie de
 // sesión sigue siendo válida. Si sí, directo a la app; si no, login.
 (async () => {
+  applyBranding();
   try {
     currentUser = await api('/api/me');
     showApp();

@@ -32,6 +32,18 @@ function setSessionCookie(res, token) {
     `session=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${30 * 24 * 60 * 60}`);
 }
 
+// ─── Marca del centro (público, sin auth) ───────────────────────────
+
+// Cada despliegue puede personalizar su nombre por variables de entorno,
+// sin tocar código: CENTER_TITLE y CENTER_SUBTITLE. Es lo que permite
+// que la misma app sirva a cualquier centro de acopio.
+app.get('/api/branding', (req, res) => {
+  res.json({
+    title: process.env.CENTER_TITLE || 'Donativos Venezuela',
+    subtitle: process.env.CENTER_SUBTITLE || 'Terremoto · Junio 2026',
+  });
+});
+
 // ─── Autenticación ──────────────────────────────────────────────────
 
 app.post('/api/login', (req, res) => {
