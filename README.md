@@ -2,6 +2,8 @@
 
 **Control de inventario de donativos para centros de acopio en emergencias.**
 
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/noTeUd?referralCode=9xNKTS&utm_medium=integration&utm_source=template&utm_campaign=acopio)
+
 Nacida durante la emergencia del terremoto de Venezuela (junio 2026), esta app
 permite a cualquier centro de acopio llevar el registro de **entradas**
 (donaciones recibidas) y **salidas** (despachos) de bienes y dinero, con
@@ -34,7 +36,16 @@ y de dónde vino o a dónde fue.
 Cada centro de acopio corre su **propia instancia** con su propia base de
 datos — tus datos son tuyos y de nadie más.
 
-### En Railway (recomendado, ~5 minutos)
+### Con un clic (recomendado)
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/noTeUd?referralCode=9xNKTS&utm_medium=integration&utm_source=template&utm_campaign=acopio)
+
+El template ya trae el volumen de datos y el dominio configurados. Solo te
+pedirá la contraseña del admin y, opcionalmente, el nombre de tu centro.
+Al terminar: entra con el usuario `admin`, crea a tus voluntarios en la
+pestaña *Usuarios*, y a registrar.
+
+### A mano (Railway u otro proveedor)
 
 1. Haz fork de este repo (o úsalo directo).
 2. En [railway.app](https://railway.app): **New Project → Deploy from GitHub
