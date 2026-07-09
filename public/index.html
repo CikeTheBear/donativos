@@ -297,6 +297,16 @@
           <button type="submit" class="btn btn-primary">Guardar</button>
         </form>
 
+        <div class="admin-only" hidden>
+          <h2 class="section-title">Respaldo de datos</h2>
+          <p class="empty-note">
+            Descarga una copia completa de la base de datos (artículos,
+            movimientos, usuarios). Hazlo con regularidad — por ejemplo,
+            cada domingo — y guárdala fuera de Railway.
+          </p>
+          <a class="btn btn-secondary" href="/api/backup" download>Descargar respaldo</a>
+        </div>
+
         <h2 class="section-title">Tokens de acceso (MCP)</h2>
         <p class="empty-note">
           Permiten conectar un asistente de IA (Claude) a este inventario para

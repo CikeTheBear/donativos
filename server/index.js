@@ -6,6 +6,8 @@
 
 import express from 'express';
 import { randomBytes } from 'node:crypto';
+import { unlink } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { db } from './db.js';
@@ -327,6 +329,28 @@ app.delete('/api/users/:id', requireAdmin, (req, res) => {
     return res.status(400).json({
       error: 'Este usuario tiene movimientos registrados y no se puede eliminar',
     });
+  }
+});
+
+// ─── Respaldo de la base de datos (solo admin) ─────────────────────
+
+// Descarga un snapshot de la BD completa. No se copia el archivo a
+// pelo: la BD está en modo WAL y una copia directa con escrituras en
+// curso puede salir inconsistente. db.backup() usa la API de "online
+// backup" de SQLite, que garantiza un snapshot íntegro sin parar nada.
+app.get('/api/backup', requireAdmin, async (req, res) => {
+  const stamp = new Date().toISOString().slice(0, 10);
+  const tmpFile = path.join(tmpdir(), `donativos-backup-${Date.now()}.db`);
+  try {
+    await db.backup(tmpFile);
+    res.download(tmpFile, `donativos-respaldo-${stamp}.db`, () => {
+      // Pase lo que pase con la descarga, el temporal no debe quedarse.
+      unlink(tmpFile, () => {});
+    });
+  } catch (e) {
+    console.error('Error en /api/backup:', e);
+    unlink(tmpFile, () => {});
+    res.status(500).json({ error: 'No se pudo generar el respaldo' });
   }
 });
 

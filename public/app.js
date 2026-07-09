@@ -55,8 +55,11 @@ function showApp() {
   $('#view-login').hidden = true;
   $('#view-app').hidden = false;
   $('#user-name').textContent = currentUser.name;
-  // La pestaña Usuarios solo existe para admins.
-  $('.admin-only').hidden = currentUser.role !== 'admin';
+  // Todo lo marcado admin-only (pestaña Usuarios, respaldos...) se
+  // oculta a los voluntarios. querySelectorAll: $() solo daría el primero.
+  document.querySelectorAll('.admin-only').forEach((el) => {
+    el.hidden = currentUser.role !== 'admin';
+  });
   switchTab('resumen');
 }
 
