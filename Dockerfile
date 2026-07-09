@@ -13,8 +13,8 @@ RUN npm ci --omit=dev
 COPY server ./server
 COPY public ./public
 
-# La BD vive en /app/data — montar aquí un volumen persistente.
-VOLUME /app/data
-
+# La BD vive en /app/data — montar ahí un volumen persistente al
+# desplegar (en Railway se configura en su UI, no aquí: su builder
+# rechaza la directiva VOLUME de Docker).
 EXPOSE 3000
 CMD ["node", "server/index.js"]
