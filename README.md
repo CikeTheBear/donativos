@@ -40,6 +40,11 @@ Dockerfile (Railway, Fly.io, Render...). Puntos clave:
 
 1. Define `ADMIN_PASSWORD` como variable de entorno antes del primer
    arranque (o cambia la contraseña por defecto de inmediato).
+1. Para la función de registro con IA (opcional), define `LLM_API_KEY`
+   (key de OpenRouter o de cualquier proveedor OpenAI-compatible).
+   Opcionales: `LLM_BASE_URL` (default `https://openrouter.ai/api/v1`)
+   y `LLM_MODEL` (default `anthropic/claude-haiku-4.5`). Sin key, la
+   app funciona igual — solo esa función queda desactivada.
 2. Monta un **volumen persistente** en `/app/data` — ahí vive la base de
    datos; sin volumen, se pierde en cada redeploy.
 3. El servicio debe exponer el puerto de la variable `PORT` (Railway y

@@ -1,21 +1,56 @@
-// llm.js — Interpretación de donativos en lenguaje natural con Claude.
+// llm.js — Interpretación de donativos en lenguaje natural.
 //
-// El usuario pega texto libre ("50 kg de arroz de la iglesia, $200 en
-// efectivo...") y Claude lo convierte en movimientos estructurados.
-// Usamos "structured outputs" de la API: le pasamos un JSON Schema y la
-// API GARANTIZA que la respuesta lo cumple — no hay que parsear texto
-// con regex ni manejar respuestas malformadas.
+// Agnóstico de proveedor: habla el formato "OpenAI-compatible"
+// (/chat/completions), que es el estándar de facto que exponen
+// OpenRouter, Groq, Together, Ollama y compañía. El proveedor y el
+// modelo se eligen por variables de entorno, sin tocar código:
 //
-// Importante: esta función solo PROPONE movimientos. Nunca escribe en la
-// base de datos; eso ocurre en /api/import después de que un humano
-// revisa y confirma. El LLM estructura, la persona decide.
+//   LLM_BASE_URL  (default: https://openrouter.ai/api/v1)
+//   LLM_API_KEY   (obligatoria — sin ella la función de IA se desactiva)
+//   LLM_MODEL     (default: anthropic/claude-haiku-4.5, en ids de OpenRouter)
+//
+// Pedimos JSON con response_format json_schema, pero como su
+// cumplimiento varía según modelo/proveedor, NO confiamos en él:
+// validamos la respuesta con zod y fallamos claro si no cumple.
+// La red de seguridad final sigue siendo la vista previa humana.
 
-import Anthropic from '@anthropic-ai/sdk';
+import { z } from 'zod';
 
-// Schema de lo que Claude debe devolver. anyOf permite dos formas de
-// movimiento (bienes y dinero) dentro del mismo array. Structured
-// outputs exige additionalProperties:false y todos los campos required.
-const MOVEMENTS_SCHEMA = {
+const BASE_URL = process.env.LLM_BASE_URL || 'https://openrouter.ai/api/v1';
+const MODEL = process.env.LLM_MODEL || 'anthropic/claude-haiku-4.5';
+
+// ── Validación con zod: la verdad sobre qué acepta la app ──────────
+const goodsSchema = z.object({
+  kind: z.literal('bien'),
+  type: z.enum(['entrada', 'salida']),
+  item_name: z.string().min(1),
+  category: z.string(),
+  unit: z.string(),
+  quantity: z.number(),
+  party: z.string(),
+  notes: z.string(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+
+const moneySchema = z.object({
+  kind: z.literal('dinero'),
+  type: z.enum(['entrada', 'salida']),
+  amount: z.number(),
+  currency: z.enum(['USD', 'EUR', 'VES']),
+  party: z.string(),
+  notes: z.string(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+
+const responseSchema = z.object({
+  movements: z.array(z.discriminatedUnion('kind', [goodsSchema, moneySchema])),
+});
+
+// ── JSON Schema para response_format (dialecto OpenAI "strict") ────
+// Exige additionalProperties:false y todos los campos en required.
+// Usamos enum de un valor en vez de const por compatibilidad: no todos
+// los proveedores implementan const en modo estricto.
+const MOVEMENTS_JSON_SCHEMA = {
   type: 'object',
   additionalProperties: false,
   required: ['movements'],
@@ -25,29 +60,27 @@ const MOVEMENTS_SCHEMA = {
       items: {
         anyOf: [
           {
-            // Movimiento de bienes (comida, medicinas, ropa...)
             type: 'object',
             additionalProperties: false,
             required: ['kind', 'type', 'item_name', 'category', 'unit', 'quantity', 'party', 'notes', 'date'],
             properties: {
-              kind: { const: 'bien' },
+              kind: { type: 'string', enum: ['bien'] },
               type: { type: 'string', enum: ['entrada', 'salida'] },
               item_name: { type: 'string', description: 'Nombre del artículo. Si coincide con uno del catálogo, usar EXACTAMENTE el nombre del catálogo.' },
-              category: { type: 'string', description: 'Categoría: Alimentos, Medicinas, Ropa, Higiene, Agua, Refugio u otra.' },
-              unit: { type: 'string', description: 'Unidad de medida: kg, unidades, litros, cajas, paquetes...' },
+              category: { type: 'string', description: 'Alimentos, Medicinas, Ropa, Higiene, Agua, Refugio u otra.' },
+              unit: { type: 'string', description: 'kg, unidades, litros, cajas, paquetes...' },
               quantity: { type: 'number' },
               party: { type: 'string', description: 'Donante (entrada) o destino (salida). Cadena vacía si no se menciona.' },
-              notes: { type: 'string', description: 'Detalles extra que no caben en otros campos. Cadena vacía si no hay.' },
-              date: { type: 'string', description: 'Fecha YYYY-MM-DD. Si el texto no la menciona, usar la fecha de hoy.' },
+              notes: { type: 'string', description: 'Detalles extra. Cadena vacía si no hay.' },
+              date: { type: 'string', description: 'YYYY-MM-DD. Si el texto no la menciona, la fecha de hoy.' },
             },
           },
           {
-            // Movimiento de dinero
             type: 'object',
             additionalProperties: false,
             required: ['kind', 'type', 'amount', 'currency', 'party', 'notes', 'date'],
             properties: {
-              kind: { const: 'dinero' },
+              kind: { type: 'string', enum: ['dinero'] },
               type: { type: 'string', enum: ['entrada', 'salida'] },
               amount: { type: 'number' },
               currency: { type: 'string', enum: ['USD', 'EUR', 'VES'] },
@@ -62,21 +95,11 @@ const MOVEMENTS_SCHEMA = {
   },
 };
 
-/**
- * Interpreta texto libre y devuelve movimientos propuestos.
- * @param {string} text - El texto que pegó el usuario.
- * @param {Array} catalog - Artículos existentes, para que Claude reutilice
- *   nombres exactos en vez de crear duplicados ("Arroz" vs "arroz blanco").
- */
-export async function parseDonations(text, catalog) {
-  // El cliente lee ANTHROPIC_API_KEY del entorno automáticamente.
-  const client = new Anthropic();
-
+function buildSystemPrompt(catalog) {
   const today = new Date().toISOString().slice(0, 10);
-
-  const system = `Eres el asistente de registro de un centro de acopio de donativos
+  return `Eres el asistente de registro de un centro de acopio de donativos
 para la emergencia del terremoto de Venezuela. Convierte el texto del usuario en
-movimientos de inventario estructurados.
+movimientos de inventario estructurados. Responde ÚNICAMENTE con el JSON pedido.
 
 Reglas:
 - Hoy es ${today}. Resuelve fechas relativas ("ayer", "el lunes") a YYYY-MM-DD.
@@ -92,22 +115,60 @@ Reglas:
 
 Catálogo actual de artículos:
 ${JSON.stringify(catalog)}`;
+}
 
-  const response = await client.messages.create({
-    model: 'claude-opus-4-8',
-    max_tokens: 16000,
-    thinking: { type: 'adaptive' },
-    system,
-    output_config: { format: { type: 'json_schema', schema: MOVEMENTS_SCHEMA } },
-    messages: [{ role: 'user', content: text }],
+/**
+ * Interpreta texto libre y devuelve movimientos propuestos (validados).
+ * @param {string} text - El texto que pegó el usuario.
+ * @param {Array} catalog - Artículos existentes, para reutilizar nombres.
+ */
+export async function parseDonations(text, catalog) {
+  const res = await fetch(`${BASE_URL}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${process.env.LLM_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      messages: [
+        { role: 'system', content: buildSystemPrompt(catalog) },
+        { role: 'user', content: text },
+      ],
+      response_format: {
+        type: 'json_schema',
+        json_schema: { name: 'movimientos', strict: true, schema: MOVEMENTS_JSON_SCHEMA },
+      },
+    }),
   });
 
-  // stop_reason distinto de end_turn = respuesta incompleta o rechazada:
-  // mejor fallar claro que devolver datos a medias.
-  if (response.stop_reason !== 'end_turn') {
-    throw new Error(`La interpretación no se completó (${response.stop_reason})`);
+  if (!res.ok) {
+    // Los proveedores OpenAI-compatibles devuelven { error: { message } }.
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error?.message || `el proveedor LLM respondió ${res.status}`);
   }
 
-  const textBlock = response.content.find((b) => b.type === 'text');
-  return JSON.parse(textBlock.text).movements;
+  const data = await res.json();
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) throw new Error('el proveedor LLM devolvió una respuesta vacía');
+
+  // Algunos modelos envuelven el JSON en un bloque markdown pese al
+  // response_format: lo toleramos quitando el envoltorio si existe.
+  const cleaned = content.trim().replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
+
+  let parsed;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    throw new Error('el modelo no devolvió JSON válido — reintenta o prueba otro modelo (LLM_MODEL)');
+  }
+
+  // Validación real: aquí es donde la app decide qué acepta, no el proveedor.
+  const result = responseSchema.safeParse(parsed);
+  if (!result.success) {
+    const detail = result.error.issues[0];
+    throw new Error(`el modelo devolvió una estructura inesperada (${detail.path.join('.')}: ${detail.message}) — reintenta o prueba otro modelo`);
+  }
+
+  return result.data.movements;
 }

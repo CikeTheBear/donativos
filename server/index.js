@@ -219,9 +219,9 @@ app.delete('/api/money/:id', requireAdmin, (req, res) => {
 // Paso 1: el LLM convierte texto libre en movimientos PROPUESTOS.
 // No escribe nada en la BD — devuelve la propuesta para revisión humana.
 app.post('/api/parse', async (req, res) => {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.LLM_API_KEY) {
     return res.status(503).json({
-      error: 'La función de IA no está configurada (falta ANTHROPIC_API_KEY en el servidor)',
+      error: 'La función de IA no está configurada (falta LLM_API_KEY en el servidor)',
     });
   }
   const { text } = req.body || {};
