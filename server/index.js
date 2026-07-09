@@ -15,7 +15,7 @@ import {
   requireAuth, requireAdmin,
 } from './auth.js';
 import { parseDonations } from './llm.js';
-import { getStock, getMoneyBalances, importBatch } from './inventory.js';
+import { getStock, getMoneyBalances, importBatch, deleteItemById } from './inventory.js';
 import { mountMcp, hashToken } from './mcp.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -95,6 +95,16 @@ app.post('/api/items', (req, res) => {
       return res.status(400).json({ error: 'Ya existe un artículo con ese nombre' });
     }
     throw e;
+  }
+});
+
+// Borrar artículo del catálogo (solo admin, solo sin movimientos).
+// Misma lógica y misma regla que la herramienta MCP donativos_borrar_articulo.
+app.delete('/api/items/:id', requireAdmin, (req, res) => {
+  try {
+    res.json({ ok: true, name: deleteItemById(Number(req.params.id)) });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
   }
 });
 

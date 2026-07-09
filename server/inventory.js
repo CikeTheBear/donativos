@@ -51,10 +51,11 @@ export const deleteMovements = db.transaction((kind, ids) => {
 
 // Borra un artículo del catálogo. Solo si no tiene movimientos: borrar
 // un artículo con historial destruiría la trazabilidad del inventario.
-export function deleteItem(name) {
-  const item = db.prepare('SELECT * FROM items WHERE lower(trim(name)) = lower(trim(?))')
-    .get(name);
-  if (!item) throw new Error(`No existe el artículo "${name}"`);
+// Dos entradas (por id desde la web, por nombre desde el MCP) que
+// convergen en la misma validación.
+export function deleteItemById(id) {
+  const item = db.prepare('SELECT * FROM items WHERE id = ?').get(id);
+  if (!item) throw new Error('Artículo no encontrado');
 
   const count = db.prepare('SELECT COUNT(*) AS n FROM movements WHERE item_id = ?')
     .get(item.id).n;
@@ -66,6 +67,13 @@ export function deleteItem(name) {
 
   db.prepare('DELETE FROM items WHERE id = ?').run(item.id);
   return item.name;
+}
+
+export function deleteItem(name) {
+  const item = db.prepare('SELECT * FROM items WHERE lower(trim(name)) = lower(trim(?))')
+    .get(name);
+  if (!item) throw new Error(`No existe el artículo "${name}"`);
+  return deleteItemById(item.id);
 }
 
 // Importa un lote de movimientos (bienes y/o dinero) en UNA transacción:

@@ -94,13 +94,29 @@ const tabLoaders = {
   cuenta: loadTokens,
 };
 
+let currentTab = 'resumen';
+
 function switchTab(name) {
+  currentTab = name;
   document.querySelectorAll('.tab').forEach((t) =>
     t.classList.toggle('active', t.dataset.tab === name));
   document.querySelectorAll('.tab-panel').forEach((p) =>
     p.hidden = p.id !== `tab-${name}`);
   tabLoaders[name]();
 }
+
+// Al volver a la pestaña del navegador, recargar la vista activa: los
+// datos pueden haber cambiado por otra vía (otro voluntario, el MCP,
+// otro dispositivo) y una vista desactualizada confunde.
+// Registrar queda fuera a propósito: recargar sus formularios pisaría
+// lo que el usuario esté escribiendo.
+const REFRESH_ON_FOCUS = new Set(['resumen', 'historial', 'usuarios', 'cuenta']);
+
+window.addEventListener('focus', () => {
+  if (currentUser && REFRESH_ON_FOCUS.has(currentTab)) {
+    Promise.resolve(tabLoaders[currentTab]()).catch(() => {});
+  }
+});
 
 $('#main-tabs').addEventListener('click', (e) => {
   const tab = e.target.closest('.tab');
@@ -130,19 +146,39 @@ async function loadSummary() {
     const catRow = r.category !== lastCategory
       ? `<tr class="cat-row"><td colspan="5">${esc(r.category)}</td></tr>` : '';
     lastCategory = r.category;
+    // Un artículo sin ningún movimiento es solo una entrada de catálogo
+    // (creado por error o en pruebas): el admin puede eliminarlo. Con
+    // movimientos no se puede — se perdería la trazabilidad.
+    const canDelete = currentUser.role === 'admin' && r.entradas === 0 && r.salidas === 0;
     return catRow + `
       <tr>
         <td>${esc(r.name)}</td>
         <td>${esc(r.category)}</td>
         <td class="num">${fmtNum(r.entradas)}</td>
         <td class="num">${fmtNum(r.salidas)}</td>
-        <td class="num ${r.stock <= 0 ? 'stock-zero' : ''}">${fmtNum(r.stock)} ${esc(r.unit)}</td>
+        <td class="num ${r.stock <= 0 ? 'stock-zero' : ''}">
+          ${fmtNum(r.stock)} ${esc(r.unit)}
+          ${canDelete ? `<button class="btn-delete" data-id="${r.id}">eliminar</button>` : ''}
+        </td>
       </tr>`;
   }).join('');
 
   $('#stock-table').hidden = stock.length === 0;
   $('#stock-empty').hidden = stock.length > 0;
 }
+
+// Eliminar artículo del catálogo (delegación sobre la tabla de stock).
+$('#stock-table').addEventListener('click', async (e) => {
+  const btn = e.target.closest('.btn-delete');
+  if (!btn) return;
+  if (!confirm('¿Eliminar este artículo del catálogo?')) return;
+  try {
+    await api(`/api/items/${btn.dataset.id}`, { method: 'DELETE' });
+    loadSummary();
+  } catch (err) {
+    alert(err.message);
+  }
+});
 
 // ─── Registrar movimientos ──────────────────────────────────────────
 
