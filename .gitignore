@@ -1,0 +1,5 @@
+# Dependencias
+node_modules/
+
+# Base de datos local (¡los datos reales nunca van al repo!)
+data/

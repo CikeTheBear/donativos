@@ -1,0 +1,520 @@
+/* styles.css — Estética "manifiesto de acopio".
+ *
+ * La referencia visual son los documentos de un centro de acopio real:
+ * papel kraft de las cajas de suministros, sellos de tinta para marcar
+ * ENTRADA/SALIDA, y cifras en monoespaciada como en una lista de carga.
+ * Sin fuentes externas: todo debe funcionar con internet inestable.
+ */
+
+:root {
+  /* Paleta */
+  --kraft:       #E8DCC3;  /* papel de caja de suministros (fondo) */
+  --kraft-deep:  #D9C9A6;  /* kraft más oscuro para bordes/bandas */
+  --papel:       #FDFBF6;  /* papel blanco de formulario (tarjetas) */
+  --tinta:       #2B2417;  /* tinta principal, marrón casi negro */
+  --tinta-suave: #6E6350;  /* texto secundario */
+  --azul-boli:   #1F4B7A;  /* tinta azul de bolígrafo: acciones */
+  --sello-verde: #2F6E45;  /* sello ENTRADA */
+  --sello-rojo:  #A33B24;  /* sello SALIDA (rojo óxido) */
+
+  /* Tipografía: display condensada de estarcido (stencil), datos en mono */
+  --font-display: 'Arial Narrow', 'Helvetica Neue Condensed', system-ui, sans-serif;
+  --font-body: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', 'Consolas', monospace;
+}
+
+* { box-sizing: border-box; margin: 0; }
+
+/* El atributo hidden aplica display:none con prioridad baja, y clases
+ * como .login-wrap { display:grid } lo anularían. Esta regla garantiza
+ * que hidden SIEMPRE oculte, que es lo que todo el JS asume. */
+[hidden] { display: none !important; }
+
+body {
+  font-family: var(--font-body);
+  background: var(--kraft);
+  /* Textura sutil de papel: dos gradientes casi invisibles cruzados */
+  background-image:
+    repeating-linear-gradient(0deg, transparent 0 2px, rgba(43,36,23,0.015) 2px 4px),
+    repeating-linear-gradient(90deg, transparent 0 3px, rgba(43,36,23,0.012) 3px 6px);
+  color: var(--tinta);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+/* ═══ Login ═══ */
+
+.login-wrap {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.login-card {
+  background: var(--papel);
+  border: 2px solid var(--tinta);
+  padding: 2rem 1.75rem;
+  width: 100%;
+  max-width: 22rem;
+  box-shadow: 6px 6px 0 rgba(43, 36, 23, 0.18);
+}
+
+.brand-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.25em;
+  color: var(--tinta-suave);
+}
+
+.brand-title {
+  font-family: var(--font-display);
+  font-size: 2.3rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  line-height: 1.02;
+  margin: 0.25rem 0;
+}
+
+.brand-sub {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--tinta-suave);
+  border-bottom: 2px dashed var(--kraft-deep);
+  padding-bottom: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+/* ═══ Barra superior y pestañas ═══ */
+
+.topbar {
+  background: var(--tinta);
+  color: var(--kraft);
+}
+
+.topbar-inner {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 0.75rem 1rem 0.4rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.brand-mark {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 1.35rem;
+  letter-spacing: 0.18em;
+}
+
+.brand-detail {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  opacity: 0.65;
+  margin-left: 0.5rem;
+}
+
+.topbar-user {
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.tabs {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 0 1rem;
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+}
+
+.tab {
+  background: none;
+  border: none;
+  color: var(--kraft);
+  opacity: 0.6;
+  font: 600 0.9rem var(--font-body);
+  padding: 0.55rem 0.9rem;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  white-space: nowrap;
+}
+
+.tab:hover { opacity: 0.9; }
+
+.tab.active {
+  opacity: 1;
+  border-bottom-color: var(--kraft);
+}
+
+/* ═══ Contenido ═══ */
+
+.content {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 4rem;
+}
+
+.section-title {
+  font-family: var(--font-display);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 1.05rem;
+  margin: 1.75rem 0 0.75rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 2px solid var(--tinta);
+}
+
+.section-title:first-child { margin-top: 0; }
+
+.card {
+  background: var(--papel);
+  border: 1.5px solid var(--tinta);
+  padding: 1.25rem;
+  box-shadow: 4px 4px 0 rgba(43, 36, 23, 0.12);
+}
+
+/* ═══ Formularios ═══ */
+
+label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--tinta-suave);
+  margin-bottom: 0.9rem;
+}
+
+input, select {
+  display: block;
+  width: 100%;
+  margin-top: 0.25rem;
+  padding: 0.55rem 0.6rem;
+  font: 1rem var(--font-body);
+  color: var(--tinta);
+  background: #fff;
+  border: 1.5px solid var(--kraft-deep);
+  border-radius: 0;
+}
+
+input:focus, select:focus, button:focus-visible {
+  outline: 2px solid var(--azul-boli);
+  outline-offset: 1px;
+}
+
+input[type="number"] { font-family: var(--font-mono); }
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.form-card { max-width: 30rem; }
+
+.form-error {
+  color: var(--sello-rojo);
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+/* ═══ Botones ═══ */
+
+.btn {
+  font: 700 0.9rem var(--font-body);
+  padding: 0.6rem 1.1rem;
+  border: 1.5px solid var(--tinta);
+  cursor: pointer;
+  background: var(--papel);
+  color: var(--tinta);
+}
+
+.btn-primary {
+  background: var(--azul-boli);
+  border-color: var(--azul-boli);
+  color: #fff;
+}
+
+.btn-primary:hover { filter: brightness(1.12); }
+
+.btn-secondary:hover, .btn-ghost:hover { background: var(--kraft); }
+
+.btn-ghost {
+  border-style: dashed;
+  background: transparent;
+  font-weight: 600;
+}
+
+.topbar .btn-ghost {
+  color: var(--kraft);
+  border-color: var(--kraft);
+  padding: 0.25rem 0.7rem;
+  font-size: 0.8rem;
+}
+
+.btn-block { width: 100%; }
+
+/* ═══ Selector bienes/dinero e historial ═══ */
+
+.kind-switch {
+  display: inline-flex;
+  border: 1.5px solid var(--tinta);
+  margin-bottom: 1rem;
+  background: var(--papel);
+}
+
+.kind-btn {
+  font: 700 0.85rem var(--font-body);
+  padding: 0.5rem 1.4rem;
+  border: none;
+  background: none;
+  color: var(--tinta-suave);
+  cursor: pointer;
+}
+
+.kind-btn.active {
+  background: var(--tinta);
+  color: var(--kraft);
+}
+
+/* ═══ El sello ENTRADA/SALIDA (elemento firma) ═══
+ * Los radios de tipo de movimiento se estilizan como sellos de goma:
+ * borde doble, mayúsculas espaciadas, tinta verde o roja. El input
+ * real queda oculto visualmente pero sigue siendo accesible. */
+
+.type-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.type-option input {
+  position: absolute;
+  opacity: 0;
+  width: 1px; height: 1px;
+}
+
+.type-option span {
+  display: block;
+  text-align: center;
+  font-family: var(--font-display);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  font-size: 1rem;
+  padding: 0.65rem 0.5rem;
+  border: 2px dashed var(--kraft-deep);
+  color: var(--tinta-suave);
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Sello "estampado" al seleccionar */
+.type-entrada input:checked + span {
+  border: 3px double var(--sello-verde);
+  color: var(--sello-verde);
+  background: rgba(47, 110, 69, 0.07);
+}
+
+.type-salida input:checked + span {
+  border: 3px double var(--sello-rojo);
+  color: var(--sello-rojo);
+  background: rgba(163, 59, 36, 0.07);
+}
+
+.type-option input:focus-visible + span {
+  outline: 2px solid var(--azul-boli);
+  outline-offset: 2px;
+}
+
+/* Versión mini del sello, para el historial */
+.stamp {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  padding: 0.1rem 0.45rem;
+  border: 2px double;
+}
+
+.stamp-entrada { color: var(--sello-verde); border-color: var(--sello-verde); }
+.stamp-salida  { color: var(--sello-rojo);  border-color: var(--sello-rojo); }
+
+.new-item-fields {
+  border: 1.5px dashed var(--kraft-deep);
+  padding: 0.9rem;
+  margin: 0.9rem 0;
+}
+
+.register-ok {
+  margin-top: 1rem;
+  font-weight: 600;
+  color: var(--sello-verde);
+}
+
+/* ═══ Tarjetas de dinero ═══ */
+
+.money-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.75rem;
+}
+
+.money-card {
+  background: var(--papel);
+  border: 1.5px solid var(--tinta);
+  padding: 0.9rem 1rem;
+  box-shadow: 4px 4px 0 rgba(43, 36, 23, 0.12);
+}
+
+.money-card .currency {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  color: var(--tinta-suave);
+}
+
+.money-card .amount {
+  font-family: var(--font-mono);
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.money-card .detail {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--tinta-suave);
+}
+
+/* ═══ Tablas ═══ */
+
+.table-scroll { overflow-x: auto; }
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--papel);
+  border: 1.5px solid var(--tinta);
+  font-size: 0.9rem;
+}
+
+.data-table th {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  text-align: left;
+  padding: 0.55rem 0.75rem;
+  background: var(--tinta);
+  color: var(--kraft);
+}
+
+.data-table td {
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--kraft-deep);
+}
+
+.data-table .num {
+  text-align: right;
+  font-family: var(--font-mono);
+}
+
+.data-table .cat-row td {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--tinta-suave);
+  background: rgba(217, 201, 166, 0.25);
+}
+
+.stock-zero { color: var(--sello-rojo); font-weight: 700; }
+
+/* ═══ Historial ═══ */
+
+.history-list { display: grid; gap: 0.5rem; }
+
+.history-row {
+  background: var(--papel);
+  border: 1.5px solid var(--kraft-deep);
+  padding: 0.6rem 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.history-row .what { flex: 1; min-width: 10rem; }
+
+.history-row .qty {
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.history-row .meta {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--tinta-suave);
+  width: 100%;
+}
+
+.btn-delete {
+  background: none;
+  border: none;
+  color: var(--sello-rojo);
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* ═══ Usuarios ═══ */
+
+.users-list { display: grid; gap: 0.5rem; margin-bottom: 1rem; }
+
+.user-row {
+  background: var(--papel);
+  border: 1.5px solid var(--kraft-deep);
+  padding: 0.6rem 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.user-row .role {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--tinta-suave);
+}
+
+.user-row .name { flex: 1; font-weight: 600; }
+
+.empty-note {
+  color: var(--tinta-suave);
+  padding: 1rem 0;
+}
+
+/* ═══ Móvil ═══ */
+
+@media (max-width: 480px) {
+  .field-row { grid-template-columns: 1fr; gap: 0; }
+  .brand-detail { display: none; }
+}
+
+/* Respeto a usuarios que desactivan animaciones en su sistema */
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

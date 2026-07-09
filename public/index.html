@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Acopio — Donativos Venezuela</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ═══ Vista de login (se oculta al iniciar sesión) ═══ -->
+  <div id="view-login" class="login-wrap" hidden>
+    <form id="login-form" class="login-card">
+      <p class="brand-eyebrow">Centro de acopio</p>
+      <h1 class="brand-title">DONATIVOS<br>VENEZUELA</h1>
+      <p class="brand-sub">Terremoto · Junio 2026</p>
+
+      <label>
+        Usuario
+        <input type="text" id="login-username" autocomplete="username" required>
+      </label>
+      <label>
+        Contraseña
+        <input type="password" id="login-password" autocomplete="current-password" required>
+      </label>
+      <p id="login-error" class="form-error" hidden></p>
+      <button type="submit" class="btn btn-primary btn-block">Entrar</button>
+    </form>
+  </div>
+
+  <!-- ═══ App principal ═══ -->
+  <div id="view-app" hidden>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="topbar-brand">
+          <span class="brand-mark">ACOPIO</span>
+          <span class="brand-detail">Donativos · Venezuela 2026</span>
+        </div>
+        <div class="topbar-user">
+          <span id="user-name"></span>
+          <button id="btn-logout" class="btn btn-ghost">Salir</button>
+        </div>
+      </div>
+      <nav class="tabs" id="main-tabs">
+        <button data-tab="resumen" class="tab active">Resumen</button>
+        <button data-tab="registrar" class="tab">Registrar</button>
+        <button data-tab="historial" class="tab">Historial</button>
+        <button data-tab="usuarios" class="tab admin-only" hidden>Usuarios</button>
+        <button data-tab="cuenta" class="tab">Cuenta</button>
+      </nav>
+    </header>
+
+    <main class="content">
+
+      <!-- ─── Resumen: dinero + stock actual ─── -->
+      <section id="tab-resumen" class="tab-panel">
+        <h2 class="section-title">Dinero disponible</h2>
+        <div id="money-cards" class="money-cards"></div>
+
+        <h2 class="section-title">Stock de bienes</h2>
+        <div class="table-scroll">
+          <table class="data-table" id="stock-table">
+            <thead>
+              <tr>
+                <th>Artículo</th>
+                <th>Categoría</th>
+                <th class="num">Entradas</th>
+                <th class="num">Salidas</th>
+                <th class="num">Stock</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p id="stock-empty" class="empty-note" hidden>
+          Aún no hay artículos. Registra la primera donación en la pestaña <strong>Registrar</strong>.
+        </p>
+      </section>
+
+      <!-- ─── Registrar: bienes o dinero, entrada o salida ─── -->
+      <section id="tab-registrar" class="tab-panel" hidden>
+
+        <!-- Selector bienes/dinero: cambia qué formulario se muestra -->
+        <div class="kind-switch">
+          <button id="kind-goods" class="kind-btn active">Bienes</button>
+          <button id="kind-money" class="kind-btn">Dinero</button>
+        </div>
+
+        <!-- Formulario de bienes -->
+        <form id="form-goods" class="card form-card">
+          <div class="type-switch">
+            <label class="type-option type-entrada">
+              <input type="radio" name="goods-type" value="entrada" checked>
+              <span>Entrada</span>
+            </label>
+            <label class="type-option type-salida">
+              <input type="radio" name="goods-type" value="salida">
+              <span>Salida</span>
+            </label>
+          </div>
+
+          <label>
+            Artículo
+            <select id="goods-item" required>
+              <option value="">— Elegir artículo —</option>
+            </select>
+          </label>
+
+          <button type="button" id="btn-new-item" class="btn btn-ghost">+ Artículo nuevo</button>
+
+          <!-- Sub-formulario para crear un artículo del catálogo al vuelo -->
+          <div id="new-item-fields" class="new-item-fields" hidden>
+            <label>
+              Nombre del artículo
+              <input type="text" id="new-item-name" placeholder="Arroz, Paracetamol 500mg, Mantas…">
+            </label>
+            <div class="field-row">
+              <label>
+                Categoría
+                <input type="text" id="new-item-category" list="category-list" placeholder="Alimentos">
+                <datalist id="category-list">
+                  <option value="Alimentos"><option value="Medicinas"><option value="Ropa">
+                  <option value="Higiene"><option value="Agua"><option value="Refugio">
+                </datalist>
+              </label>
+              <label>
+                Unidad
+                <input type="text" id="new-item-unit" list="unit-list" placeholder="kg">
+                <datalist id="unit-list">
+                  <option value="unidades"><option value="kg"><option value="litros">
+                  <option value="cajas"><option value="paquetes">
+                </datalist>
+              </label>
+            </div>
+            <button type="button" id="btn-save-item" class="btn btn-secondary">Guardar artículo</button>
+          </div>
+
+          <div class="field-row">
+            <label>
+              Cantidad
+              <input type="number" id="goods-qty" min="0.01" step="any" required>
+            </label>
+            <label>
+              Fecha
+              <input type="date" id="goods-date" required>
+            </label>
+          </div>
+
+          <label>
+            <span id="goods-party-label">Donante (opcional)</span>
+            <input type="text" id="goods-party">
+          </label>
+
+          <label>
+            Notas (opcional)
+            <input type="text" id="goods-notes">
+          </label>
+
+          <p id="goods-error" class="form-error" hidden></p>
+          <button type="submit" class="btn btn-primary btn-block">Registrar movimiento</button>
+        </form>
+
+        <!-- Formulario de dinero -->
+        <form id="form-money" class="card form-card" hidden>
+          <div class="type-switch">
+            <label class="type-option type-entrada">
+              <input type="radio" name="money-type" value="entrada" checked>
+              <span>Entrada</span>
+            </label>
+            <label class="type-option type-salida">
+              <input type="radio" name="money-type" value="salida">
+              <span>Salida</span>
+            </label>
+          </div>
+
+          <div class="field-row">
+            <label>
+              Monto
+              <input type="number" id="money-amount" min="0.01" step="any" required>
+            </label>
+            <label>
+              Moneda
+              <select id="money-currency">
+                <option value="USD">USD $</option>
+                <option value="EUR">EUR €</option>
+                <option value="VES">Bs</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="field-row">
+            <label>
+              Fecha
+              <input type="date" id="money-date" required>
+            </label>
+            <label>
+              <span id="money-party-label">Donante (opcional)</span>
+              <input type="text" id="money-party">
+            </label>
+          </div>
+
+          <label>
+            Notas (opcional)
+            <input type="text" id="money-notes">
+          </label>
+
+          <p id="money-error" class="form-error" hidden></p>
+          <button type="submit" class="btn btn-primary btn-block">Registrar movimiento</button>
+        </form>
+
+        <p id="register-ok" class="register-ok" hidden></p>
+      </section>
+
+      <!-- ─── Historial de movimientos ─── -->
+      <section id="tab-historial" class="tab-panel" hidden>
+        <div class="kind-switch">
+          <button id="hist-goods" class="kind-btn active">Bienes</button>
+          <button id="hist-money" class="kind-btn">Dinero</button>
+        </div>
+        <div id="history-list" class="history-list"></div>
+        <p id="history-empty" class="empty-note" hidden>No hay movimientos registrados todavía.</p>
+      </section>
+
+      <!-- ─── Gestión de usuarios (solo admin) ─── -->
+      <section id="tab-usuarios" class="tab-panel" hidden>
+        <h2 class="section-title">Equipo</h2>
+        <div id="users-list" class="users-list"></div>
+
+        <h2 class="section-title">Añadir voluntario</h2>
+        <form id="form-user" class="card form-card">
+          <div class="field-row">
+            <label>
+              Nombre completo
+              <input type="text" id="user-fullname" required>
+            </label>
+            <label>
+              Usuario (para entrar)
+              <input type="text" id="user-username" autocomplete="off" required>
+            </label>
+          </div>
+          <div class="field-row">
+            <label>
+              Contraseña (mín. 8)
+              <input type="text" id="user-password" autocomplete="off" required>
+            </label>
+            <label>
+              Rol
+              <select id="user-role">
+                <option value="voluntario">Voluntario</option>
+                <option value="admin">Administrador</option>
+              </select>
+            </label>
+          </div>
+          <p id="user-error" class="form-error" hidden></p>
+          <button type="submit" class="btn btn-primary">Crear usuario</button>
+        </form>
+      </section>
+
+      <!-- ─── Cuenta: cambio de contraseña ─── -->
+      <section id="tab-cuenta" class="tab-panel" hidden>
+        <h2 class="section-title">Cambiar mi contraseña</h2>
+        <form id="form-password" class="card form-card">
+          <label>
+            Contraseña actual
+            <input type="password" id="pw-current" autocomplete="current-password" required>
+          </label>
+          <label>
+            Nueva contraseña (mín. 8)
+            <input type="password" id="pw-next" autocomplete="new-password" required>
+          </label>
+          <p id="pw-error" class="form-error" hidden></p>
+          <p id="pw-ok" class="register-ok" hidden>Contraseña actualizada.</p>
+          <button type="submit" class="btn btn-primary">Guardar</button>
+        </form>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
