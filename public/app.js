@@ -147,7 +147,7 @@ async function loadSummary() {
   let lastCategory = null;
   tbody.innerHTML = stock.map((r) => {
     const catRow = r.category !== lastCategory
-      ? `<tr class="cat-row"><td colspan="5">${esc(r.category)}</td></tr>` : '';
+      ? `<tr class="cat-row"><td colspan="7">${esc(r.category)}</td></tr>` : '';
     lastCategory = r.category;
     // Un artículo sin ningún movimiento es solo una entrada de catálogo
     // (creado por error o en pruebas): el admin puede eliminarlo. Con
@@ -157,12 +157,11 @@ async function loadSummary() {
       <tr>
         <td>${esc(r.name)}</td>
         <td>${esc(r.category)}</td>
+        <td class="unit">${esc(r.unit)}</td>
         <td class="num">${fmtNum(r.entradas)}</td>
         <td class="num">${fmtNum(r.salidas)}</td>
-        <td class="num ${r.stock <= 0 ? 'stock-zero' : ''}">
-          ${fmtNum(r.stock)} ${esc(r.unit)}
-          ${canDelete ? `<button class="btn-delete" data-id="${r.id}">eliminar</button>` : ''}
-        </td>
+        <td class="num ${r.stock <= 0 ? 'stock-zero' : ''}">${fmtNum(r.stock)}</td>
+        <td class="actions">${canDelete ? `<button class="btn-delete" data-id="${r.id}">eliminar</button>` : ''}</td>
       </tr>`;
   }).join('');
 

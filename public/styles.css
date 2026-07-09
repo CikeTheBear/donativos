@@ -483,6 +483,20 @@ textarea:focus { outline: 2px solid var(--azul-boli); outline-offset: 1px; }
   font-family: var(--font-mono);
 }
 
+/* Unidad de medida: en mono discreta — es metadato, no protagonista */
+.data-table .unit {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--tinta-suave);
+}
+
+/* Columna de acciones: estrecha, sin robar espacio a los números */
+.data-table .actions {
+  text-align: right;
+  white-space: nowrap;
+  width: 1%;
+}
+
 .data-table .cat-row td {
   font-family: var(--font-mono);
   font-size: 0.68rem;
