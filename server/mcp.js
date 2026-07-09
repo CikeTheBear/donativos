@@ -18,7 +18,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { z } from 'zod';
 import { createHash } from 'node:crypto';
 import { db } from './db.js';
-import { getStock, getMoneyBalances, importBatch } from './inventory.js';
+import { getStock, getMoneyBalances, importBatch, deleteMovements, deleteItem } from './inventory.js';
 
 // Los tokens se guardan hasheados (ver db.js). SHA-256 basta aquí: los
 // tokens son aleatorios de 256 bits, no contraseñas humanas adivinables,
@@ -176,6 +176,59 @@ Los movimientos quedan registrados a nombre de ${user.name} (dueño del token).`
         return toolResult({ registrados: results.length, detalle: results });
       } catch (e) {
         return toolError(`${e.message}. No se registró ningún movimiento del lote (rollback completo).`);
+      }
+    },
+  );
+
+  server.registerTool(
+    'donativos_borrar_movimientos',
+    {
+      title: 'Borrar movimientos (solo admin)',
+      description: `Elimina movimientos por id — para corregir errores de registro o limpiar pruebas. El stock se recalcula solo (siempre se deriva de los movimientos).
+
+Los ids se obtienen con donativos_historial. Requiere que el dueño del token sea administrador.
+
+IMPORTANTE: esta acción es irreversible. Confirma con el usuario QUÉ movimientos concretos va a borrar (muéstraselos) antes de llamar a esta herramienta.`,
+      inputSchema: {
+        tipo: z.enum(['bienes', 'dinero']).describe('De qué historial son los ids'),
+        ids: z.array(z.number().int().positive()).min(1)
+          .describe('Ids de los movimientos a borrar (de donativos_historial)'),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ tipo, ids }) => {
+      if (user.role !== 'admin') {
+        return toolError('Solo un administrador puede borrar movimientos. Este token pertenece a un usuario con rol voluntario.');
+      }
+      const { deleted, notFound } = deleteMovements(tipo, ids);
+      return toolResult({
+        borrados: deleted.length,
+        ids_borrados: deleted,
+        ...(notFound.length ? { ids_no_encontrados: notFound } : {}),
+      });
+    },
+  );
+
+  server.registerTool(
+    'donativos_borrar_articulo',
+    {
+      title: 'Borrar artículo del catálogo (solo admin)',
+      description: `Elimina un artículo del catálogo por nombre. Solo funciona si el artículo NO tiene movimientos registrados (para no destruir la trazabilidad); si los tiene, el error indica cómo proceder.
+
+Útil para limpiar artículos creados por error o en pruebas. Requiere rol administrador. Irreversible: confirma con el usuario antes de llamar.`,
+      inputSchema: {
+        nombre: z.string().min(1).describe('Nombre exacto del artículo (no distingue mayúsculas)'),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ nombre }) => {
+      if (user.role !== 'admin') {
+        return toolError('Solo un administrador puede borrar artículos. Este token pertenece a un usuario con rol voluntario.');
+      }
+      try {
+        return toolResult({ borrado: deleteItem(nombre) });
+      } catch (e) {
+        return toolError(e.message);
       }
     },
   );

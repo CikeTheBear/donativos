@@ -34,6 +34,40 @@ export function getMoneyBalances() {
   `).all().map((r) => ({ ...r, disponible: r.recibido - r.entregado }));
 }
 
+// Borra movimientos por id (bienes o dinero) en una transacción.
+// Borrar recalcula el stock implícitamente (el stock siempre se deriva
+// de los movimientos). Devuelve cuántos se borraron y qué ids no
+// existían, para que el llamador pueda avisar de ids equivocados.
+export const deleteMovements = db.transaction((kind, ids) => {
+  const table = kind === 'dinero' ? 'money_movements' : 'movements';
+  const deleted = [];
+  const notFound = [];
+  for (const id of ids) {
+    const info = db.prepare(`DELETE FROM ${table} WHERE id = ?`).run(id);
+    (info.changes > 0 ? deleted : notFound).push(id);
+  }
+  return { deleted, notFound };
+});
+
+// Borra un artículo del catálogo. Solo si no tiene movimientos: borrar
+// un artículo con historial destruiría la trazabilidad del inventario.
+export function deleteItem(name) {
+  const item = db.prepare('SELECT * FROM items WHERE lower(trim(name)) = lower(trim(?))')
+    .get(name);
+  if (!item) throw new Error(`No existe el artículo "${name}"`);
+
+  const count = db.prepare('SELECT COUNT(*) AS n FROM movements WHERE item_id = ?')
+    .get(item.id).n;
+  if (count > 0) {
+    throw new Error(
+      `"${item.name}" tiene ${count} movimiento(s) registrados. ` +
+      'Borra primero esos movimientos si son de prueba (sus ids salen en el historial).');
+  }
+
+  db.prepare('DELETE FROM items WHERE id = ?').run(item.id);
+  return item.name;
+}
+
 // Importa un lote de movimientos (bienes y/o dinero) en UNA transacción:
 // o entra el lote completo o no entra nada. Crea artículos nuevos si
 // hace falta y valida que ninguna salida deje el stock en negativo.
